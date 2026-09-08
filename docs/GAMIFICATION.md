@@ -1,0 +1,2 @@
+# Gamificación responsable
+XP premia respuesta, dificultad, finalización y precisión. El bonus de racha está limitado y las repeticiones reducen su recompensa para impedir farming. Las estrellas comunican calidad (completar, buena precisión, dominio). No hay clasificación pública, compra de cofres, pérdida de progreso ni presión social. En trading, stop, riesgo y fidelidad al plan pesan más que PnL.

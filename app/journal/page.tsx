@@ -1,0 +1,1 @@
+import {JournalForm} from "@/components/journal-form";export default function Journal(){return <><span className="eyebrow">Trading responsable</span><h1>Journal de decisiones</h1><p className="muted">Revisa el proceso, no persigas el resultado. Tus notas son privadas.</p><JournalForm/></>}
