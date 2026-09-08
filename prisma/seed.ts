@@ -14,7 +14,7 @@ async function main(){await prisma.questionAttempt.deleteMany();await prisma.les
      slug: l.id, title: l.title, summary: l.summary, concept: l.concept,
      visualExample: l.example, order: li, xpReward: l.xp,
      exercises: { create: l.exercises.map(e => ({
-      type: e.type, prompt: e.prompt, difficulty: e.difficulty,
+      contentKey: e.id, type: e.type, prompt: e.prompt, difficulty: e.difficulty,
       options: e.options ?? undefined, correctAnswer: e.answer,
       explanation: e.explanation, hints: e.hints
      })) }
