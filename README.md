@@ -38,6 +38,8 @@ Provisiona PostgreSQL, configura variables seguras, ejecuta `prisma migrate depl
 3. Ejecuta `npm run db:migrate:deploy` contra la base de producción antes del primer tráfico y `npm run db:seed` solo si quieres cargar el perfil demo.
 4. Tras cambiar `prisma/schema.prisma`, crea y confirma una migración local con `npm run db:migrate -- --name <cambio>` y vuelve a desplegar.
 
+Si Vercel informa `P1012`, ejecuta `npm run db:validate` antes de volver a desplegar. El schema debe usar bloques Prisma multilínea; las declaraciones compactadas en una sola línea no son sintaxis válida.
+
 ## Privacidad y seguridad
 Minimización de datos, sin publicidad, chat, brokers, dinero real, localización o rankings públicos. Las operaciones de progreso se validan en servidor; la autorización por relación tutor-estudiante debe preceder toda consulta real.
 
