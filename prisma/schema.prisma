@@ -1,0 +1,57 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+
+enum Role { STUDENT PARENT ADMIN }
+enum CourseKind { MATH ENGLISH FINANCE TRADING }
+enum AttemptStatus { STARTED COMPLETED ABANDONED }
+enum TradeDirection { BUY SELL }
+
+model User {
+  id String @id @default(cuid())
+  email String? @unique
+  passwordHash String?
+  role Role
+  createdAt DateTime @default(now())
+  student StudentProfile?
+  parent ParentProfile?
+  settings Settings?
+}
+model StudentProfile {
+  id String @id @default(cuid())
+  userId String @unique
+  displayName String
+  birthYear Int?
+  avatar String @default("nova")
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  progress StudentProgress[]
+  mastery SkillMastery[]
+  attempts LessonAttempt[]
+  achievements StudentAchievement[]
+  challengeAttempts DailyChallengeAttempt[]
+  xpTransactions XPTransaction[]
+  streak Streak?
+  tradingAccount TradingAccount?
+  parentLinks ParentStudentRelationship[]
+}
+model ParentProfile { id String @id @default(cuid()) userId String @unique displayName String user User @relation(fields:[userId], references:[id], onDelete:Cascade) studentLinks ParentStudentRelationship[] }
+model ParentStudentRelationship { id String @id @default(cuid()) parentId String studentId String parent ParentProfile @relation(fields:[parentId],references:[id],onDelete:Cascade) student StudentProfile @relation(fields:[studentId],references:[id],onDelete:Cascade) @@unique([parentId,studentId]) }
+model Settings { id String @id @default(cuid()) userId String @unique language String @default("es") theme String @default("system") sounds Boolean @default(true) adaptiveDifficulty Boolean @default(true) dailyGoalMinutes Int @default(20) internalReminders Boolean @default(true) user User @relation(fields:[userId],references:[id],onDelete:Cascade) }
+model Course { id String @id @default(cuid()) slug String @unique kind CourseKind title String description String order Int worlds World[] progress StudentProgress[] }
+model World { id String @id @default(cuid()) courseId String title String description String order Int course Course @relation(fields:[courseId],references:[id],onDelete:Cascade) units Unit[] @@unique([courseId,order]) }
+model Unit { id String @id @default(cuid()) worldId String title String skillKey String order Int prerequisiteMastery Int @default(0) world World @relation(fields:[worldId],references:[id],onDelete:Cascade) lessons Lesson[] @@unique([worldId,order]) }
+model Lesson { id String @id @default(cuid()) unitId String slug String title String summary String concept String visualExample String order Int xpReward Int @default(50) unit Unit @relation(fields:[unitId],references:[id],onDelete:Cascade) exercises Exercise[] attempts LessonAttempt[] @@unique([unitId,slug]) }
+model Exercise { id String @id @default(cuid()) contentKey String @unique lessonId String type String prompt String difficulty Int options Json? correctAnswer String explanation String hints Json lesson Lesson @relation(fields:[lessonId],references:[id],onDelete:Cascade) questionAttempts QuestionAttempt[] }
+model StudentProgress { id String @id @default(cuid()) studentId String courseId String level Int @default(1) xp Int @default(0) mastery Float @default(0) completedLessons Int @default(0) student StudentProfile @relation(fields:[studentId],references:[id],onDelete:Cascade) course Course @relation(fields:[courseId],references:[id],onDelete:Cascade) @@unique([studentId,courseId]) }
+model SkillMastery { id String @id @default(cuid()) studentId String skillKey String score Float @default(0) attempts Int @default(0) correct Int @default(0) lastPracticedAt DateTime? student StudentProfile @relation(fields:[studentId],references:[id],onDelete:Cascade) @@unique([studentId,skillKey]) }
+model LessonAttempt { id String @id @default(cuid()) studentId String lessonId String status AttemptStatus @default(STARTED) correct Int @default(0) total Int @default(0) stars Int @default(0) xpEarned Int @default(0) durationSeconds Int @default(0) startedAt DateTime @default(now()) completedAt DateTime? student StudentProfile @relation(fields:[studentId],references:[id],onDelete:Cascade) lesson Lesson @relation(fields:[lessonId],references:[id],onDelete:Cascade) questionAttempts QuestionAttempt[] }
+model QuestionAttempt { id String @id @default(cuid()) lessonAttemptId String exerciseId String answer String correct Boolean responseMs Int hintsUsed Int @default(0) createdAt DateTime @default(now()) lessonAttempt LessonAttempt @relation(fields:[lessonAttemptId],references:[id],onDelete:Cascade) exercise Exercise @relation(fields:[exerciseId],references:[id],onDelete:Cascade) }
+model Achievement { id String @id @default(cuid()) key String @unique title String description String icon String xpReward Int @default(0) studentAchievements StudentAchievement[] }
+model StudentAchievement { id String @id @default(cuid()) studentId String achievementId String earnedAt DateTime @default(now()) student StudentProfile @relation(fields:[studentId],references:[id],onDelete:Cascade) achievement Achievement @relation(fields:[achievementId],references:[id]) @@unique([studentId,achievementId]) }
+model DailyChallenge { id String @id @default(cuid()) date DateTime @unique title String prompt String answer String xpReward Int attempts DailyChallengeAttempt[] }
+model DailyChallengeAttempt { id String @id @default(cuid()) challengeId String studentId String correct Boolean completedAt DateTime @default(now()) challenge DailyChallenge @relation(fields:[challengeId],references:[id]) student StudentProfile @relation(fields:[studentId],references:[id],onDelete:Cascade) @@unique([challengeId,studentId]) }
+model XPTransaction { id String @id @default(cuid()) studentId String amount Int reason String sourceId String? createdAt DateTime @default(now()) student StudentProfile @relation(fields:[studentId],references:[id],onDelete:Cascade) @@index([studentId,createdAt]) }
+model Streak { id String @id @default(cuid()) studentId String @unique current Int @default(0) longest Int @default(0) lastActivityDate DateTime? student StudentProfile @relation(fields:[studentId],references:[id],onDelete:Cascade) }
+model TradingAccount { id String @id @default(cuid()) studentId String @unique balance Decimal @default(10000) equity Decimal @default(10000) peakEquity Decimal @default(10000) student StudentProfile @relation(fields:[studentId],references:[id],onDelete:Cascade) trades Trade[] journals TradingJournal[] }
+model TradingScenario { id String @id @default(cuid()) slug String @unique title String description String marketData Json difficulty Int trades Trade[] }
+model Trade { id String @id @default(cuid()) accountId String scenarioId String direction TradeDirection entry Decimal exit Decimal? stopLoss Decimal takeProfit Decimal positionSize Decimal riskPercent Decimal pnl Decimal? followedPlan Boolean @default(true) processXP Int @default(0) openedAt DateTime @default(now()) closedAt DateTime? account TradingAccount @relation(fields:[accountId],references:[id],onDelete:Cascade) scenario TradingScenario @relation(fields:[scenarioId],references:[id]) journal TradingJournal? }
+model TradingJournal { id String @id @default(cuid()) accountId String tradeId String? @unique asset String direction TradeDirection entry Decimal stopLoss Decimal takeProfit Decimal riskPercent Decimal result String reason String followedStrategy Boolean emotionBefore String emotionAfter String lessonLearned String createdAt DateTime @default(now()) account TradingAccount @relation(fields:[accountId],references:[id],onDelete:Cascade) trade Trade? @relation(fields:[tradeId],references:[id]) }

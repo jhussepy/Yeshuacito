@@ -1,0 +1,1 @@
+export default function Loading(){return <div aria-label="Cargando" aria-live="polite"><div className="card" style={{height:180,opacity:.5}}/><div className="stats">{[1,2,3,4].map(x=><div className="card" style={{height:100,opacity:.35}} key={x}/>)}</div></div>}

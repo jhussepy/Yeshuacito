@@ -1,0 +1,1 @@
+import Link from "next/link";export default function NotFound(){return <div className="card" style={{maxWidth:600,margin:"100px auto",textAlign:"center"}}><div style={{fontSize:50}}>🧭</div><h1>Este camino aún no existe</h1><p className="muted">Volvamos al mapa para elegir una misión disponible.</p><Link className="btn" href="/">Ir al inicio</Link></div>}
