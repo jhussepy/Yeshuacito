@@ -27,11 +27,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Código de configuración incorrecto." }, { status: 401 });
   }
 
-  if (!isEnabled(process.env.NEXT_PUBLIC_DEMO_MODE)) {
+  // NEXT_PUBLIC_DEMO_MODE is retained temporarily for existing deployments.
+  const demoMode = process.env.DEMO_MODE ?? process.env.NEXT_PUBLIC_DEMO_MODE;
+  if (!isEnabled(demoMode)) {
     return NextResponse.json(
       {
         error:
-          "El modo demo no está habilitado. En Vercel configura NEXT_PUBLIC_DEMO_MODE con el valor true para Production y vuelve a desplegar.",
+          "El modo demo no está habilitado. En Vercel configura DEMO_MODE con el valor true para Production y vuelve a desplegar.",
       },
       { status: 403 },
     );

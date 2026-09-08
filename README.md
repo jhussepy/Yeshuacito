@@ -27,13 +27,13 @@ Abre `http://localhost:3000`. El modo demo presenta a Alex sin exponer datos rea
 `app` contiene rutas y API; `components`, UI reusable; `features`, motores de dominio puros; `data`, contenido inicial estructurado; `prisma`, modelo y seed; `tests`, pruebas; `docs`, decisiones técnicas. Véase [arquitectura](docs/ARCHITECTURE.md) y [modelo de contenido](docs/CONTENT_MODEL.md).
 
 ## Variables
-`DATABASE_URL` apunta al pool transaccional usado por la aplicación y `DIRECT_URL` al pool de sesión usado por Prisma para operaciones de schema. `AUTH_SECRET` y `SETUP_SECRET` deben ser secretos diferentes de 32+ caracteres; `NEXT_PUBLIC_DEMO_MODE` habilita únicamente el perfil demo local. Nunca confirmar `.env`.
+`DATABASE_URL` apunta al pool transaccional usado por la aplicación y `DIRECT_URL` al pool de sesión usado por Prisma para operaciones de schema. `AUTH_SECRET` y `SETUP_SECRET` deben ser secretos diferentes de 32+ caracteres; `DEMO_MODE` habilita únicamente el perfil demo en el servidor y puede configurarse como **Config** en Vercel. Nunca confirmar `.env`.
 
 ## Deploy
 Esta V1 todavía no contiene un historial de migraciones confirmado. Por eso, preparar el schema con `db:push` es un paso **obligatorio** antes del primer despliegue; no uses `prisma migrate deploy` hasta que exista `prisma/migrations`.
 
 ### Vercel
-1. Importa el repositorio y configura `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET` y `NEXT_PUBLIC_DEMO_MODE` en **Settings → Environment Variables**. `NEXT_PUBLIC_DEMO_MODE` debe tener el valor `true` (sin comillas) para **Production**. En Supabase, usa Transaction pooler (puerto 6543) para `DATABASE_URL` y Session pooler (puerto 5432) para `DIRECT_URL`.
+1. Importa el repositorio y configura `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET` y `DEMO_MODE` en **Settings → Environment Variables**. Crea `DEMO_MODE` como **Config**, con el valor `true` (sin comillas), para **Production**. No uses el prefijo `NEXT_PUBLIC_`: esta opción solo se consume en el servidor. En Supabase, usa Transaction pooler (puerto 6543) para `DATABASE_URL` y Session pooler (puerto 5432) para `DIRECT_URL`.
 2. Desde una terminal segura con ambas variables configuradas, ejecuta `npm run db:push`. Prisma usará `DIRECT_URL` para crear o sincronizar las tablas requeridas por la V1.
 3. Si quieres el perfil y contenido demostrativo, ejecuta `npm run db:seed`. El seed es idempotente y no elimina cursos, intentos ni progreso de otros usuarios.
 4. Usa `npm run build` como Build Command y despliega. El script genera Prisma Client antes de compilar Next.js; `postinstall` también lo regenera al instalar dependencias.

@@ -37,7 +37,7 @@ export function SetupForm() {
         Usa esta pantalla únicamente después de ejecutar el SQL inicial en Supabase. El proceso es idempotente y no borra progreso existente.
       </p>
       <p className="muted">
-        En Vercel, <strong>NEXT_PUBLIC_DEMO_MODE</strong> debe valer <strong>true</strong> en Production. Después de cambiarlo, vuelve a desplegar.
+        En Vercel, <strong>DEMO_MODE</strong> debe valer <strong>true</strong> en Production. Después de cambiarlo, vuelve a desplegar.
       </p>
       <div className="field">
         <label htmlFor="setup-secret">Código SETUP_SECRET</label>
