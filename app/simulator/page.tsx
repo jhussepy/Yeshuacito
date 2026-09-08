@@ -1,0 +1,2 @@
+import {TradingSimulator} from "@/components/trading-simulator";import Link from "next/link";
+export default function Simulator(){return <><header className="topbar"><div><span className="eyebrow">Laboratorio seguro</span><h1 style={{margin:0}}>Trading Lab</h1></div><Link href="/journal" className="btn secondary">Abrir journal</Link></header><div className="notice" style={{marginBottom:18}}><strong>Capital 100% ficticio.</strong> No conecta con brokers ni permite usar dinero real. El proceso responsable otorga más XP que una ganancia accidental.</div><TradingSimulator/></>}
