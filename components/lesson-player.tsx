@@ -21,13 +21,17 @@ type AnswerRecord = {
 };
 type SavedResult = { xp: number; mastery: number; stars: number; accuracy: number };
 
+function isSavedResult(value: unknown): value is SavedResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Record<string, unknown>;
+  return ["xp", "mastery", "stars", "accuracy"].every((key) => typeof result[key] === "number");
+}
+
 export function LessonPlayer({ lesson, course }: { lesson: Lesson; course: string }) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState("");
   const [checked, setChecked] = useState(false);
-  const [correct, setCorrect] = useState(0);
-  const [answered, setAnswered] = useState(0);
   const [currentHints, setCurrentHints] = useState(0);
   const [answers, setAnswers] = useState<AnswerRecord[]>([]);
   const [lessonStartedAt, setLessonStartedAt] = useState(Date.now());
@@ -55,15 +59,11 @@ export function LessonPlayer({ lesson, course }: { lesson: Lesson; course: strin
       hintsUsed: currentHints,
     };
     setAnswers((current) => [...current, response]);
-    setAnswered((value) => value + 1);
-    if (isCorrect) setCorrect((value) => value + 1);
     setChecked(true);
   }
 
   async function persistCompletion() {
     const finalAnswers = answers;
-    const finalCorrect = correct;
-    const totalHints = finalAnswers.reduce((sum, answer) => sum + answer.hintsUsed, 0);
     setPhase("saving");
     setSaveError("");
 
@@ -73,16 +73,31 @@ export function LessonPlayer({ lesson, course }: { lesson: Lesson; course: strin
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lessonId: lesson.id,
-          correct: finalCorrect,
-          total: answered,
-          difficulty: Math.max(...lesson.exercises.map((item) => item.difficulty)),
           responseMs: Math.max(1, Date.now() - lessonStartedAt),
-          hints: totalHints,
-          answers: finalAnswers,
+          answers: finalAnswers.map(({ exerciseId, answer, responseMs, hintsUsed }) => ({
+            exerciseId,
+            answer,
+            responseMs,
+            hintsUsed,
+          })),
         }),
       });
-      const payload = (await response.json()) as SavedResult & { error?: string };
-      if (!response.ok) throw new Error(payload.error ?? "No pudimos guardar el intento");
+      const responseBody = await response.text();
+      let payload: unknown = null;
+      if (responseBody) {
+        try {
+          payload = JSON.parse(responseBody);
+        } catch {
+          throw new Error(`El servidor devolvió una respuesta inválida (${response.status})`);
+        }
+      }
+      const apiError = payload && typeof payload === "object" && "error" in payload
+        ? String((payload as { error: unknown }).error)
+        : null;
+      if (!response.ok) {
+        throw new Error(apiError ?? `El servidor no pudo guardar el intento (${response.status})`);
+      }
+      if (!isSavedResult(payload)) throw new Error("El servidor no confirmó el progreso guardado");
       setSavedResult(payload);
       setPhase("result");
     } catch (error) {

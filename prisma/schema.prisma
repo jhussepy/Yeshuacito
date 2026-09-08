@@ -147,6 +147,7 @@ model Exercise {
   id               String            @id @default(cuid())
   contentKey       String            @unique
   lessonId         String
+  order            Int               @default(0)
   type             String
   prompt           String
   difficulty       Int
