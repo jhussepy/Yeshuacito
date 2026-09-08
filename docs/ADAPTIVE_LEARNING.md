@@ -1,0 +1,2 @@
+# Aprendizaje adaptativo
+El dominio 0–100 combina corrección, dificultad, velocidad razonable y pistas. Sus bandas son: refuerzo (0–39), progreso (40–69), competente (70–84), dominado (85–94) y maestría (95–100). Bajo 60 se refuerza; sobre 90 se eleva dificultad. Dos errores recientes fuerzan una variante accesible. Tres pistas progresan de orientación a estrategia y ejemplo; la respuesta nunca aparece primero.
