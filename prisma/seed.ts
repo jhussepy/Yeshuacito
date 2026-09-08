@@ -1,36 +1,251 @@
-import {PrismaClient,CourseKind,Role} from "@prisma/client";import {courses} from "../data/courses";
-const prisma=new PrismaClient();
-async function main(){await prisma.questionAttempt.deleteMany();await prisma.lessonAttempt.deleteMany();await prisma.exercise.deleteMany();await prisma.lesson.deleteMany();await prisma.unit.deleteMany();await prisma.world.deleteMany();await prisma.studentProgress.deleteMany();await prisma.course.deleteMany();
- const studentUser=await prisma.user.upsert({where:{email:"alex.demo@nexora.local"},update:{},create:{email:"alex.demo@nexora.local",role:Role.STUDENT,student:{create:{displayName:"Alex",birthYear:2018,streak:{create:{current:12,longest:12,lastActivityDate:new Date()}},tradingAccount:{create:{}}}},settings:{create:{language:"es",dailyGoalMinutes:20}}},include:{student:true}});
- const parentUser=await prisma.user.upsert({where:{email:"tutor.demo@nexora.local"},update:{},create:{email:"tutor.demo@nexora.local",role:Role.PARENT,parent:{create:{displayName:"Tutor de Alex"}},settings:{create:{language:"es"}}},include:{parent:true}});
- if(studentUser.student&&parentUser.parent)await prisma.parentStudentRelationship.upsert({where:{parentId_studentId:{parentId:parentUser.parent.id,studentId:studentUser.student.id}},update:{},create:{parentId:parentUser.parent.id,studentId:studentUser.student.id}});
- const kind={matematicas:CourseKind.MATH,english:CourseKind.ENGLISH,finanzas:CourseKind.FINANCE,trading:CourseKind.TRADING} as const;
- for (const c of courses) {
-  const worlds = c.worlds.map((w, wi) => ({
-   title: w.title, description: w.description, order: wi,
-   units: { create: [{
-    title: w.title, skillKey: w.id, order: 0, prerequisiteMastery: wi ? 80 : 0,
-    lessons: { create: w.lessons.map((l, li) => ({
-     slug: l.id, title: l.title, summary: l.summary, concept: l.concept,
-     visualExample: l.example, order: li, xpReward: l.xp,
-     exercises: { create: l.exercises.map(e => ({
-      contentKey: e.id, type: e.type, prompt: e.prompt, difficulty: e.difficulty,
-      options: e.options ?? undefined, correctAnswer: e.answer,
-      explanation: e.explanation, hints: e.hints
-     })) }
-    })) }
-   }] }
-  }));
-  const dbCourse = await prisma.course.create({ data: {
-   slug: c.slug, kind: kind[c.slug], title: c.title, description: c.subtitle,
-   order: courses.indexOf(c), worlds: { create: worlds }
-  }});
-  if (studentUser.student) {
-   const values = { matematicas:[14,2850,82], english:[6,1240,71], finanzas:[4,780,64], trading:[3,520,58] }[c.slug];
-   await prisma.studentProgress.create({ data: { studentId:studentUser.student.id, courseId:dbCourse.id, level:values[0], xp:values[1], mastery:values[2], completedLessons:Math.floor(values[2]/10) }});
+import { CourseKind, PrismaClient, Role } from "@prisma/client";
+import { courses } from "../data/courses";
+
+const prisma = new PrismaClient();
+const DEMO_STUDENT_EMAIL = "alex.demo@nexora.local";
+const DEMO_PARENT_EMAIL = "tutor.demo@nexora.local";
+
+const courseKind = {
+  matematicas: CourseKind.MATH,
+  english: CourseKind.ENGLISH,
+  finanzas: CourseKind.FINANCE,
+  trading: CourseKind.TRADING,
+} as const;
+
+const initialProgress = {
+  matematicas: { level: 14, xp: 2_850, mastery: 82 },
+  english: { level: 6, xp: 1_240, mastery: 71 },
+  finanzas: { level: 4, xp: 780, mastery: 64 },
+  trading: { level: 3, xp: 520, mastery: 58 },
+} as const;
+
+async function seedDemoProfiles() {
+  const studentUser = await prisma.user.upsert({
+    where: { email: DEMO_STUDENT_EMAIL },
+    update: {},
+    create: {
+      email: DEMO_STUDENT_EMAIL,
+      role: Role.STUDENT,
+      student: {
+        create: {
+          displayName: "Alex",
+          birthYear: 2018,
+          streak: { create: { current: 12, longest: 12, lastActivityDate: new Date() } },
+          tradingAccount: { create: {} },
+        },
+      },
+      settings: { create: { language: "es", dailyGoalMinutes: 20 } },
+    },
+    include: { student: true },
+  });
+  const parentUser = await prisma.user.upsert({
+    where: { email: DEMO_PARENT_EMAIL },
+    update: {},
+    create: {
+      email: DEMO_PARENT_EMAIL,
+      role: Role.PARENT,
+      parent: { create: { displayName: "Tutor de Alex" } },
+      settings: { create: { language: "es" } },
+    },
+    include: { parent: true },
+  });
+
+  if (!studentUser.student || !parentUser.parent) {
+    throw new Error("Los usuarios demo existen pero sus perfiles no están disponibles");
   }
- }
- for(const a of [{key:"quick-mind",title:"Mente rápida",description:"20 respuestas correctas",icon:"⚡"},{key:"english-explorer",title:"English Explorer",description:"Primer mundo completado",icon:"🧭"},{key:"disciplined-trader",title:"Trader disciplinado",description:"10 operaciones con riesgo respetado",icon:"🛡️"}])await prisma.achievement.upsert({where:{key:a.key},update:a,create:a});
- await prisma.tradingScenario.upsert({where:{slug:"trend-pullback"},update:{},create:{slug:"trend-pullback",title:"Tendencia con retroceso",description:"Practica riesgo y estructura",difficulty:2,marketData:{candles:[30,42,35,57,48,65,72]}}});
- console.log(`Seed listo: ${courses.reduce((n,c)=>n+c.worlds.reduce((m,w)=>m+w.lessons.length,0),0)} lecciones para Alex.`)}
-main().finally(()=>prisma.$disconnect());
+
+  await prisma.parentStudentRelationship.upsert({
+    where: {
+      parentId_studentId: {
+        parentId: parentUser.parent.id,
+        studentId: studentUser.student.id,
+      },
+    },
+    update: {},
+    create: {
+      parentId: parentUser.parent.id,
+      studentId: studentUser.student.id,
+    },
+  });
+
+  return studentUser.student;
+}
+
+async function seedCurriculum(studentId: string) {
+  for (const [courseOrder, course] of courses.entries()) {
+    const persistedCourse = await prisma.course.upsert({
+      where: { slug: course.slug },
+      update: {
+        kind: courseKind[course.slug],
+        title: course.title,
+        description: course.subtitle,
+        order: courseOrder,
+      },
+      create: {
+        slug: course.slug,
+        kind: courseKind[course.slug],
+        title: course.title,
+        description: course.subtitle,
+        order: courseOrder,
+      },
+    });
+
+    for (const [worldOrder, world] of course.worlds.entries()) {
+      const persistedWorld = await prisma.world.upsert({
+        where: { courseId_order: { courseId: persistedCourse.id, order: worldOrder } },
+        update: { title: world.title, description: world.description },
+        create: {
+          courseId: persistedCourse.id,
+          title: world.title,
+          description: world.description,
+          order: worldOrder,
+        },
+      });
+      const unit = await prisma.unit.upsert({
+        where: { worldId_order: { worldId: persistedWorld.id, order: 0 } },
+        update: {
+          title: world.title,
+          skillKey: world.id,
+          prerequisiteMastery: worldOrder === 0 ? 0 : 80,
+        },
+        create: {
+          worldId: persistedWorld.id,
+          title: world.title,
+          skillKey: world.id,
+          order: 0,
+          prerequisiteMastery: worldOrder === 0 ? 0 : 80,
+        },
+      });
+
+      for (const [lessonOrder, lesson] of world.lessons.entries()) {
+        const persistedLesson = await prisma.lesson.upsert({
+          where: { unitId_slug: { unitId: unit.id, slug: lesson.id } },
+          update: {
+            title: lesson.title,
+            summary: lesson.summary,
+            concept: lesson.concept,
+            visualExample: lesson.example,
+            order: lessonOrder,
+            xpReward: lesson.xp,
+          },
+          create: {
+            unitId: unit.id,
+            slug: lesson.id,
+            title: lesson.title,
+            summary: lesson.summary,
+            concept: lesson.concept,
+            visualExample: lesson.example,
+            order: lessonOrder,
+            xpReward: lesson.xp,
+          },
+        });
+
+        for (const [exerciseOrder, exercise] of lesson.exercises.entries()) {
+          await prisma.exercise.upsert({
+            where: { contentKey: exercise.id },
+            update: {
+              lessonId: persistedLesson.id,
+              order: exerciseOrder,
+              type: exercise.type,
+              prompt: exercise.prompt,
+              difficulty: exercise.difficulty,
+              options: exercise.options ?? undefined,
+              correctAnswer: exercise.answer,
+              explanation: exercise.explanation,
+              hints: exercise.hints,
+            },
+            create: {
+              contentKey: exercise.id,
+              lessonId: persistedLesson.id,
+              order: exerciseOrder,
+              type: exercise.type,
+              prompt: exercise.prompt,
+              difficulty: exercise.difficulty,
+              options: exercise.options ?? undefined,
+              correctAnswer: exercise.answer,
+              explanation: exercise.explanation,
+              hints: exercise.hints,
+            },
+          });
+        }
+      }
+
+      const courseMastery = initialProgress[course.slug].mastery;
+      const initialWorldMastery = Math.max(0, Math.min(100, courseMastery - worldOrder * 8));
+      await prisma.skillMastery.upsert({
+        where: { studentId_skillKey: { studentId, skillKey: world.id } },
+        update: {},
+        create: {
+          studentId,
+          skillKey: world.id,
+          score: initialWorldMastery,
+          attempts: 0,
+          correct: 0,
+        },
+      });
+    }
+
+    const defaults = initialProgress[course.slug];
+    await prisma.studentProgress.upsert({
+      where: { studentId_courseId: { studentId, courseId: persistedCourse.id } },
+      update: {},
+      create: {
+        studentId,
+        courseId: persistedCourse.id,
+        level: defaults.level,
+        xp: defaults.xp,
+        mastery: defaults.mastery,
+        completedLessons: Math.floor(defaults.mastery / 10),
+      },
+    });
+  }
+}
+
+async function seedReferenceData() {
+  const achievements = [
+    { key: "quick-mind", title: "Mente rápida", description: "20 respuestas correctas", icon: "⚡" },
+    { key: "english-explorer", title: "English Explorer", description: "Primer mundo completado", icon: "🧭" },
+    { key: "disciplined-trader", title: "Trader disciplinado", description: "10 operaciones con riesgo respetado", icon: "🛡️" },
+  ];
+  for (const achievement of achievements) {
+    await prisma.achievement.upsert({
+      where: { key: achievement.key },
+      update: achievement,
+      create: achievement,
+    });
+  }
+  await prisma.tradingScenario.upsert({
+    where: { slug: "trend-pullback" },
+    update: {
+      title: "Tendencia con retroceso",
+      description: "Practica riesgo y estructura",
+      difficulty: 2,
+      marketData: { candles: [30, 42, 35, 57, 48, 65, 72] },
+    },
+    create: {
+      slug: "trend-pullback",
+      title: "Tendencia con retroceso",
+      description: "Practica riesgo y estructura",
+      difficulty: 2,
+      marketData: { candles: [30, 42, 35, 57, 48, 65, 72] },
+    },
+  });
+}
+
+async function main() {
+  const student = await seedDemoProfiles();
+  await seedCurriculum(student.id);
+  await seedReferenceData();
+  const lessonCount = courses.reduce(
+    (total, course) => total + course.worlds.reduce((worldTotal, world) => worldTotal + world.lessons.length, 0),
+    0,
+  );
+  console.log(`Seed no destructivo listo: ${lessonCount} lecciones para Alex.`);
+}
+
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => prisma.$disconnect());

@@ -30,23 +30,18 @@ Abre `http://localhost:3000`. El modo demo presenta a Alex sin exponer datos rea
 `DATABASE_URL` apunta a PostgreSQL; `AUTH_SECRET` debe ser aleatorio y de 32+ caracteres; `NEXT_PUBLIC_DEMO_MODE` habilita únicamente el perfil demo local. Nunca confirmar `.env`.
 
 ## Deploy
-Provisiona PostgreSQL, configura variables seguras, ejecuta `prisma migrate deploy` y `npm run build`. Usa TLS, cabeceras CSP en el proxy y copias cifradas. Para producción, el siguiente incremento sustituye el selector demo por sesiones HttpOnly con credenciales parentales y códigos de acceso infantil.
+Esta V1 todavía no contiene un historial de migraciones confirmado. Por eso, preparar el schema con `db:push` es un paso **obligatorio** antes del primer despliegue; no uses `prisma migrate deploy` hasta que exista `prisma/migrations`.
 
 ### Vercel
 1. Importa el repositorio y configura `DATABASE_URL`, `AUTH_SECRET` y `NEXT_PUBLIC_DEMO_MODE` en **Settings → Environment Variables**.
-2. Usa `npm run build` como Build Command. El script genera Prisma Client antes de compilar Next.js; `postinstall` también lo regenera cuando Vercel instala dependencias.
-3. Ejecuta `npm run db:migrate:deploy` contra la base de producción antes del primer tráfico y `npm run db:seed` solo si quieres cargar el perfil demo.
-4. Tras cambiar `prisma/schema.prisma`, crea y confirma una migración local con `npm run db:migrate -- --name <cambio>` y vuelve a desplegar.
+2. Desde una terminal segura con acceso a la misma base, ejecuta `DATABASE_URL="postgresql://..." npm run db:push`. Esto crea o sincroniza las tablas requeridas por la V1.
+3. Si quieres el perfil y contenido demostrativo, ejecuta `DATABASE_URL="postgresql://..." npm run db:seed`. El seed es idempotente y no elimina cursos, intentos ni progreso de otros usuarios.
+4. Usa `npm run build` como Build Command y despliega. El script genera Prisma Client antes de compilar Next.js; `postinstall` también lo regenera al instalar dependencias.
+5. Tras cambios futuros del schema, crea y confirma una migración con `npm run db:migrate -- --name <cambio>`; cuando el repositorio ya contenga migraciones, producción podrá utilizar `prisma migrate deploy`.
+
+Nunca expongas ni confirmes `DATABASE_URL`. El build no crea tablas ni carga datos automáticamente. Sin el paso 2, la interfaz puede abrir, pero no podrá guardar lecciones. Si falta el paso 3, no existirá el perfil demo de Alex.
 
 Si Vercel informa `P1012`, ejecuta `npm run db:validate` antes de volver a desplegar. El schema debe usar bloques Prisma multilínea; las declaraciones compactadas en una sola línea no son sintaxis válida.
-
-#### Preparar la base demo remota
-El build no crea tablas ni carga datos automáticamente. Para la primera publicación, copia temporalmente el `DATABASE_URL` de Vercel en una terminal segura y ejecuta:
-```bash
-DATABASE_URL="postgresql://..." npm run db:push
-DATABASE_URL="postgresql://..." npm run db:seed
-```
-`db:push` sincroniza el schema para esta V1 sin historial de migraciones; proyectos productivos posteriores deben confirmar migraciones y usar `db:migrate:deploy`. No expongas ni confirmes la URL. Sin estos dos pasos la interfaz puede abrir, pero no podrá guardar lecciones porque no existirán las tablas y el perfil demo de Alex.
 
 ## Privacidad y seguridad
 Minimización de datos, sin publicidad, chat, brokers, dinero real, localización o rankings públicos. Las operaciones de progreso se validan en servidor; la autorización por relación tutor-estudiante debe preceder toda consulta real.

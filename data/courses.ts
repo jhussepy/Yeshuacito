@@ -1,4 +1,4 @@
-import type { Course,Exercise,Lesson,World } from "@/lib/types";
+import type { Course, Lesson, World } from "@/lib/types";
 const h=(topic:string):[string,string,string]=>[`Identifica qué sabes sobre ${topic}.`,`Descarta las opciones que contradicen el concepto.`,`Revisa el ejemplo de la lección y aplica el mismo proceso.`];
 const lesson=(prefix:string,n:number,title:string,summary:string,concept:string,example:string,skill:string,answer:string,wrong:string[]):Lesson=>({id:`${prefix}-${n}`,title,summary,concept,example,skill,xp:50,exercises:[
 {id:`${prefix}-${n}-a`,type:"choice",prompt:`Comprueba tu idea: ${summary}`,options:[answer,...wrong].sort((a,b)=>a.localeCompare(b)),answer,hints:h(skill),explanation:`La respuesta es “${answer}” porque ${concept.toLowerCase()}`,difficulty:Math.min(5,1+Math.floor(n/5)) as 1|2|3|4|5},

@@ -3,50 +3,32 @@ import { z } from "zod";
 import { Prisma, type Exercise } from "@prisma/client";
 import { calculateXP, starsForAccuracy } from "@/features/gamification/engine";
 import { updateMastery } from "@/features/progress/mastery";
+import {
+  validateCompletedAttempt,
+  type SubmittedAnswer,
+} from "@/features/assessments/attempt-validation";
 import { prisma } from "@/lib/prisma";
-
-type AnswerInput = {
-  exerciseId: string;
-  answer: string;
-  correct: boolean;
-  responseMs: number;
-  hintsUsed: number;
-};
 
 type AttemptInput = {
   lessonId: string;
-  correct: number;
-  total: number;
-  difficulty: number;
   responseMs: number;
-  hints: number;
-  answers: AnswerInput[];
+  answers: SubmittedAnswer[];
 };
 
 const answerSchema = z.object({
   exerciseId: z.string().min(1).max(100),
   answer: z.string().max(500),
-  correct: z.boolean(),
   responseMs: z.number().int().positive().max(3_600_000),
   hintsUsed: z.number().int().min(0).max(3),
-});
+}).strict();
 
 const attemptSchema = z
   .object({
     lessonId: z.string().min(1).max(80),
-    correct: z.number().int().nonnegative(),
-    total: z.number().int().positive().max(100),
-    difficulty: z.number().int().min(1).max(5),
     responseMs: z.number().int().positive().max(3_600_000),
-    hints: z.number().int().min(0).max(30),
-    answers: z.array(answerSchema).min(1).max(100),
+    answers: z.array(answerSchema).min(1).max(60),
   })
-  .refine((value: AttemptInput) => value.correct <= value.total, {
-    message: "correct no puede superar total",
-  })
-  .refine((value: AttemptInput) => value.answers.length === value.total, {
-    message: "El detalle de respuestas debe coincidir con el total",
-  });
+  .strict();
 
 export async function POST(request: Request) {
   const parsed = attemptSchema.safeParse(await request.json().catch(() => null));
@@ -62,7 +44,10 @@ export async function POST(request: Request) {
   try {
     const lesson = await prisma.lesson.findFirst({
       where: { slug: input.lessonId },
-      include: { unit: { include: { world: { include: { course: true } } } }, exercises: true },
+      include: {
+        unit: { include: { world: { include: { course: true } } } },
+        exercises: { orderBy: { order: "asc" } },
+      },
     });
     const student = await prisma.studentProfile.findFirst({
       where: { user: { email: "alex.demo@nexora.local" } },
@@ -76,21 +61,20 @@ export async function POST(request: Request) {
       );
     }
 
+    const validation = validateCompletedAttempt(
+      lesson.exercises.map((exercise: Exercise) => ({
+        id: exercise.contentKey,
+        correctAnswer: exercise.correctAnswer,
+        difficulty: exercise.difficulty,
+      })),
+      input.answers,
+    );
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.message }, { status: 400 });
+    }
     const exerciseByKey = new Map<string, Exercise>(
       lesson.exercises.map((exercise: Exercise) => [exercise.contentKey, exercise]),
     );
-    if (input.answers.some((answer: AnswerInput) => !exerciseByKey.has(answer.exerciseId))) {
-      return NextResponse.json({ error: "El intento contiene ejercicios ajenos a la lección." }, { status: 400 });
-    }
-    const normalizedAnswers = input.answers.map((answer: AnswerInput) => {
-      const expected = exerciseByKey.get(answer.exerciseId)!.correctAnswer.trim().toLocaleLowerCase();
-      const correct = answer.answer.trim().toLocaleLowerCase() === expected;
-      return { ...answer, correct };
-    });
-    const verifiedCorrect = normalizedAnswers.filter((answer: AnswerInput) => answer.correct).length;
-    if (verifiedCorrect !== input.correct) {
-      return NextResponse.json({ error: "El resumen no coincide con las respuestas verificadas." }, { status: 400 });
-    }
 
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const [priorCompletions, currentMastery, progress] = await Promise.all([
@@ -107,11 +91,11 @@ export async function POST(request: Request) {
 
       if (!progress) throw new Error("No existe progreso para este curso");
 
-      const accuracy = input.correct / input.total;
+      const accuracy = validation.correct / validation.total;
       const xp = calculateXP({
-        correct: input.correct,
-        total: input.total,
-        difficulty: input.difficulty,
+        correct: validation.correct,
+        total: validation.total,
+        difficulty: validation.difficulty,
         completed: true,
         streak: student.streak?.current ?? 0,
         priorCompletions,
@@ -119,9 +103,9 @@ export async function POST(request: Request) {
       const mastery = updateMastery(
         currentMastery?.score ?? progress.mastery,
         accuracy >= 0.7,
-        input.difficulty,
+        validation.difficulty,
         input.responseMs,
-        input.hints,
+        validation.hints,
       );
 
       const lessonAttempt = await tx.lessonAttempt.create({
@@ -129,14 +113,14 @@ export async function POST(request: Request) {
           studentId: student.id,
           lessonId: lesson.id,
           status: "COMPLETED",
-          correct: input.correct,
-          total: input.total,
+          correct: validation.correct,
+          total: validation.total,
           stars: starsForAccuracy(accuracy),
           xpEarned: xp,
           durationSeconds: Math.max(1, Math.round(input.responseMs / 1000)),
           completedAt: new Date(),
           questionAttempts: {
-            create: normalizedAnswers.map((answer: AnswerInput) => ({
+            create: validation.answers.map((answer) => ({
               exerciseId: exerciseByKey.get(answer.exerciseId)!.id,
               answer: answer.answer,
               correct: answer.correct,
@@ -153,14 +137,14 @@ export async function POST(request: Request) {
           studentId: student.id,
           skillKey: lesson.unit.skillKey,
           score: mastery,
-          attempts: input.total,
-          correct: input.correct,
+          attempts: validation.total,
+          correct: validation.correct,
           lastPracticedAt: new Date(),
         },
         update: {
           score: mastery,
-          attempts: { increment: input.total },
-          correct: { increment: input.correct },
+          attempts: { increment: validation.total },
+          correct: { increment: validation.correct },
           lastPracticedAt: new Date(),
         },
       });
