@@ -1,0 +1,2 @@
+# Base de datos
+El esquema separa identidad (`User`) y datos mínimos de perfil. El árbol curricular es normalizado. Intentos inmutables alimentan `SkillMastery`, `StudentProgress` y recomendaciones. `XPTransaction` forma un ledger auditable y evita modificar XP sin motivo. Trading separa cuenta ficticia, escenario, trade y reflexión. Índices y claves compuestas previenen duplicados de progreso, relación y recompensa.

@@ -1,0 +1,2 @@
+# Modelo de contenido
+Cada curso contiene mundos y cada mundo unidades con `skillKey` y umbral prerequisite. Una lección reúne introducción, concepto, ejemplo y ejercicios. Cada ejercicio define tipo, prompt, opciones opcionales, respuesta, tres pistas, explicación y dificultad. El contenido vive fuera de componentes. Los generadores matemáticos producen variaciones verificables; los registros persistidos pueden usar exactamente el mismo contrato.
