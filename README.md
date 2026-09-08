@@ -32,6 +32,12 @@ Abre `http://localhost:3000`. El modo demo presenta a Alex sin exponer datos rea
 ## Deploy
 Provisiona PostgreSQL, configura variables seguras, ejecuta `prisma migrate deploy` y `npm run build`. Usa TLS, cabeceras CSP en el proxy y copias cifradas. Para producción, el siguiente incremento sustituye el selector demo por sesiones HttpOnly con credenciales parentales y códigos de acceso infantil.
 
+### Vercel
+1. Importa el repositorio y configura `DATABASE_URL`, `AUTH_SECRET` y `NEXT_PUBLIC_DEMO_MODE` en **Settings → Environment Variables**.
+2. Usa `npm run build` como Build Command. El script genera Prisma Client antes de compilar Next.js; `postinstall` también lo regenera cuando Vercel instala dependencias.
+3. Ejecuta `npm run db:migrate:deploy` contra la base de producción antes del primer tráfico y `npm run db:seed` solo si quieres cargar el perfil demo.
+4. Tras cambiar `prisma/schema.prisma`, crea y confirma una migración local con `npm run db:migrate -- --name <cambio>` y vuelve a desplegar.
+
 ## Privacidad y seguridad
 Minimización de datos, sin publicidad, chat, brokers, dinero real, localización o rankings públicos. Las operaciones de progreso se validan en servidor; la autorización por relación tutor-estudiante debe preceder toda consulta real.
 

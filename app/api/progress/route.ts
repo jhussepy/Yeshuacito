@@ -1,8 +1,27 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { Exercise, Prisma } from "@prisma/client";
 import { calculateXP, starsForAccuracy } from "@/features/gamification/engine";
 import { updateMastery } from "@/features/progress/mastery";
 import { prisma } from "@/lib/prisma";
+
+type AnswerInput = {
+  exerciseId: string;
+  answer: string;
+  correct: boolean;
+  responseMs: number;
+  hintsUsed: number;
+};
+
+type AttemptInput = {
+  lessonId: string;
+  correct: number;
+  total: number;
+  difficulty: number;
+  responseMs: number;
+  hints: number;
+  answers: AnswerInput[];
+};
 
 const answerSchema = z.object({
   exerciseId: z.string().min(1).max(100),
@@ -22,10 +41,10 @@ const attemptSchema = z
     hints: z.number().int().min(0).max(30),
     answers: z.array(answerSchema).min(1).max(100),
   })
-  .refine((value) => value.correct <= value.total, {
+  .refine((value: AttemptInput) => value.correct <= value.total, {
     message: "correct no puede superar total",
   })
-  .refine((value) => value.answers.length === value.total, {
+  .refine((value: AttemptInput) => value.answers.length === value.total, {
     message: "El detalle de respuestas debe coincidir con el total",
   });
 
@@ -38,7 +57,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const input = parsed.data;
+  const input: AttemptInput = parsed.data;
   const lesson = await prisma.lesson.findFirst({
     where: { slug: input.lessonId },
     include: { unit: { include: { world: { include: { course: true } } } }, exercises: true },
@@ -55,21 +74,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const exerciseByKey = new Map(lesson.exercises.map((exercise) => [exercise.contentKey, exercise]));
-  if (input.answers.some((answer) => !exerciseByKey.has(answer.exerciseId))) {
+  const exerciseByKey = new Map<string, Exercise>(
+    lesson.exercises.map((exercise: Exercise) => [exercise.contentKey, exercise]),
+  );
+  if (input.answers.some((answer: AnswerInput) => !exerciseByKey.has(answer.exerciseId))) {
     return NextResponse.json({ error: "El intento contiene ejercicios ajenos a la lección." }, { status: 400 });
   }
-  const normalizedAnswers = input.answers.map((answer) => {
+  const normalizedAnswers = input.answers.map((answer: AnswerInput) => {
     const expected = exerciseByKey.get(answer.exerciseId)!.correctAnswer.trim().toLocaleLowerCase();
     const correct = answer.answer.trim().toLocaleLowerCase() === expected;
     return { ...answer, correct };
   });
-  const verifiedCorrect = normalizedAnswers.filter((answer) => answer.correct).length;
+  const verifiedCorrect = normalizedAnswers.filter((answer: AnswerInput) => answer.correct).length;
   if (verifiedCorrect !== input.correct) {
     return NextResponse.json({ error: "El resumen no coincide con las respuestas verificadas." }, { status: 400 });
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const [priorCompletions, currentMastery, progress] = await Promise.all([
       tx.lessonAttempt.count({
         where: { studentId: student.id, lessonId: lesson.id, status: "COMPLETED" },
@@ -113,7 +134,7 @@ export async function POST(request: Request) {
         durationSeconds: Math.max(1, Math.round(input.responseMs / 1000)),
         completedAt: new Date(),
         questionAttempts: {
-          create: normalizedAnswers.map((answer) => ({
+          create: normalizedAnswers.map((answer: AnswerInput) => ({
             exerciseId: exerciseByKey.get(answer.exerciseId)!.id,
             answer: answer.answer,
             correct: answer.correct,
