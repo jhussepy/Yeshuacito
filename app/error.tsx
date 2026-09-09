@@ -1,0 +1,1 @@
+"use client";export default function ErrorPage({reset}:{reset:()=>void}){return <div className="card" style={{maxWidth:600,margin:"100px auto",textAlign:"center"}}><h1>Algo interrumpió la misión</h1><p className="muted">Tu progreso está seguro. Puedes intentarlo de nuevo.</p><button className="btn" onClick={reset}>Reintentar</button></div>}
