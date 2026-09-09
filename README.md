@@ -41,6 +41,8 @@ Esta V1 todavía no contiene un historial de migraciones confirmado. Por eso, pr
 
 Nunca expongas ni confirmes `DATABASE_URL`. El build no crea tablas ni carga datos automáticamente. Sin el paso 2, la interfaz puede abrir, pero no podrá guardar lecciones. Si falta el paso 3, no existirá el perfil demo de Alex.
 
+Si `/setup` informa un error de base de datos, abre **Vercel → Logs → Runtime Logs**, repite la carga y busca `Web seed failed`. Los códigos `P1000` indican credenciales incorrectas, `P1001` una conexión inaccesible y `P2021` una tabla ausente. No compartas la URL ni la contraseña mostradas en los logs.
+
 ### Instalación únicamente desde interfaces web
 Si no tienes una terminal, abre **Supabase → SQL Editor → New query**, copia todo `prisma/bootstrap/001_initial.sql` desde GitHub y ejecuta **Run**. Luego crea en Vercel un `SETUP_SECRET` aleatorio de 32+ caracteres, redespliega, visita `https://tu-dominio.vercel.app/setup` e introduce ese código para cargar Alex y el currículo. Cuando aparezca el mensaje de éxito, elimina `SETUP_SECRET` de Vercel y redespliega: así el endpoint de instalación queda desactivado. Nunca pegues el secreto ni las URLs de base de datos en GitHub, chats o capturas.
 

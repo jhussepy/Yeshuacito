@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { seedDemoDatabase } from "@/services/demo-seed";
 import { isEnabled } from "@/lib/environment";
+import { databaseSetupError } from "@/features/setup/database-error";
 
 export const runtime = "nodejs";
 
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Web seed failed", error);
     return NextResponse.json(
-      { error: "No se pudo cargar la demo. Confirma que ejecutaste el SQL inicial y revisa DATABASE_URL." },
+      { error: databaseSetupError(error) },
       { status: 500 },
     );
   }
